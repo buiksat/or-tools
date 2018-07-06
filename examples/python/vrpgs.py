@@ -27,8 +27,10 @@
    here we use: 114m x 80m city block
 """
 
-from __future__ import print_function
-from six.moves import xrange
+
+import sys
+sys.path.insert(0, "/home/bahram/anaconda3/lib/python3.6/site-packages/")
+# from six.moves import xrange
 from ortools.constraint_solver import pywrapcp
 from ortools.constraint_solver import routing_enums_pb2
 
@@ -113,9 +115,9 @@ class CreateDistanceEvaluator(object):  # pylint: disable=too-few-public-methods
     self._distances = {}
 
     # precompute distance between location to have distance callback in O(1)
-    for from_node in xrange(data.num_locations):
+    for from_node in range(data.num_locations):
       self._distances[from_node] = {}
-      for to_node in xrange(data.num_locations):
+      for to_node in range(data.num_locations):
         if from_node == to_node:
           self._distances[from_node][to_node] = 0
         else:
@@ -174,7 +176,7 @@ class ConsolePrinter():
     """Prints assignment on console"""
     # Inspect solution.
     total_dist = 0
-    for vehicle_id in xrange(self.data.num_vehicles):
+    for vehicle_id in range(self.data.num_vehicles):
       index = self.routing.Start(vehicle_id)
       plan_output = 'Route for vehicle {0}:\n'.format(vehicle_id)
       route_dist = 0

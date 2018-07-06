@@ -28,7 +28,8 @@
 """
 
 
-from six.moves import xrange
+import sys
+sys.path.insert(0, "/home/bahram/anaconda3/lib/python3.6/site-packages/")
 from ortools.constraint_solver import pywrapcp
 from ortools.constraint_solver import routing_enums_pb2
 
