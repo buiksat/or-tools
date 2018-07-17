@@ -12,10 +12,17 @@ objective.
 
 The CpSolver class encapsulates searching for a solution of a model.
 
-```python
+```
+"""Simple solve."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from ortools.sat.python import cp_model
 
-def MinimalCpSat():
+
+def SimpleSolve():
   """Minimal CP-SAT example to showcase calling the solver."""
   # Creates the model.
   model = cp_model.CpModel()
@@ -24,17 +31,20 @@ def MinimalCpSat():
   x = model.NewIntVar(0, num_vals - 1, 'x')
   y = model.NewIntVar(0, num_vals - 1, 'y')
   z = model.NewIntVar(0, num_vals - 1, 'z')
-  # Adds an all-different constraint.
+  # Creates the constraints.
   model.Add(x != y)
 
   # Creates a solver and solves the model.
   solver = cp_model.CpSolver()
   status = solver.Solve(model)
 
-  if status == cp_model.MODEL_SAT:
+  if status == cp_model.FEASIBLE:
     print('x = %i' % solver.Value(x))
     print('y = %i' % solver.Value(y))
     print('z = %i' % solver.Value(z))
+
+
+SimpleSolve()
 ```
 
 ### C++ solver code
@@ -43,10 +53,12 @@ Calling SolveCpModel() will return a CpSolverResponse protobuf that contains the
 solve status, the values for each variable in the model if solve was successful,
 and some metrics.
 
-```cpp
+```
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/cp_model_solver.h"
+#include "ortools/sat/cp_model_utils.h"
 #include "ortools/sat/model.h"
+#include "ortools/sat/sat_parameters.pb.h"
 
 namespace operations_research {
 namespace sat {
@@ -72,15 +84,21 @@ void SimpleSolve() {
   const CpSolverResponse response = SolveCpModel(cp_model, &model);
   LOG(INFO) << CpSolverResponseStats(response);
 
-  if (response.status() == CpSolverStatus::MODEL_SAT) {
+  if (response.status() == CpSolverStatus::FEASIBLE) {
     // Get the value of x in the solution.
     const int64 value_x = response.solution(x);
     LOG(INFO) << "x = " << value_x;
   }
 }
 
-} // namespace sat
-} // namespace operations_research
+}  // namespace sat
+}  // namespace operations_research
+
+int main() {
+  operations_research::sat::SimpleSolve();
+
+  return EXIT_SUCCESS;
+}
 ```
 
 ### C\# code
@@ -111,7 +129,7 @@ public class CodeSamplesSat
     CpSolver solver = new CpSolver();
     CpSolverStatus status = solver.Solve(model);
 
-    if (status == CpSolverStatus.ModelSat)
+    if (status == CpSolverStatus.Feasible)
     {
       Console.WriteLine("x = " + solver.Value(x));
       Console.WriteLine("y = " + solver.Value(y));
@@ -133,8 +151,15 @@ solver. The most useful one is the time limit.
 
 ### Specifying the time limit in python
 
-```python
+```
+"""Solves a problem with a time limit."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from ortools.sat.python import cp_model
+
 
 def MinimalCpSatWithTimeLimit():
   """Minimal CP-SAT example to showcase calling the solver."""
@@ -156,18 +181,21 @@ def MinimalCpSatWithTimeLimit():
 
   status = solver.Solve(model)
 
-  if status == cp_model.MODEL_SAT:
+  if status == cp_model.FEASIBLE:
     print('x = %i' % solver.Value(x))
     print('y = %i' % solver.Value(y))
     print('z = %i' % solver.Value(z))
 
+
+MinimalCpSatWithTimeLimit()
 ```
 
 ### Specifying the time limit in C++
 
-```cpp
+```
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/cp_model_solver.h"
+#include "ortools/sat/cp_model_utils.h"
 #include "ortools/sat/model.h"
 #include "ortools/sat/sat_parameters.pb.h"
 
@@ -202,14 +230,21 @@ void SolveWithTimeLimit() {
   const CpSolverResponse response = SolveCpModel(cp_model, &model);
   LOG(INFO) << CpSolverResponseStats(response);
 
-  if (response.status() == CpSolverStatus::MODEL_SAT) {
+  if (response.status() == CpSolverStatus::FEASIBLE) {
     // Get the value of x in the solution.
     const int64 value_x = response.solution(x);
+    LOG(INFO) << "value_x = " << value_x;
   }
 }
 
-} // namespace sat
-} // namespace operations_research
+}  // namespace sat
+}  // namespace operations_research
+
+int main() {
+  operations_research::sat::SolveWithTimeLimit();
+
+  return EXIT_SUCCESS;
+}
 ```
 
 ### Specifying the time limit in C\#.
@@ -232,7 +267,7 @@ public class CodeSamplesSat
     IntVar x = model.NewIntVar(0, num_vals - 1, "x");
     IntVar y = model.NewIntVar(0, num_vals - 1, "y");
     IntVar z = model.NewIntVar(0, num_vals - 1, "z");
-    // Creates the constraints.
+    // Adds a different constraint.
     model.Add(x != y);
 
     // Creates a solver and solves the model.
@@ -243,7 +278,7 @@ public class CodeSamplesSat
 
     CpSolverStatus status = solver.Solve(model);
 
-    if (status == CpSolverStatus.ModelSat)
+    if (status == CpSolverStatus.Feasible)
     {
       Console.WriteLine("x = " + solver.Value(x));
       Console.WriteLine("y = " + solver.Value(y));
@@ -267,7 +302,13 @@ The exact implementation depends on the target language.
 
 ### Python code
 
-```python
+```
+"""Solves an optimization problem and displays all intermediate solutions."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from ortools.sat.python import cp_model
 
 
@@ -283,7 +324,7 @@ class VarArrayAndObjectiveSolutionPrinter(cp_model.CpSolverSolutionCallback):
     print('Solution %i' % self.__solution_count)
     print('  objective value = %i' % self.ObjectiveValue())
     for v in self.__variables:
-      print('  %s = %i' % (v, self.Value(v)), end = ' ')
+      print('  %s = %i' % (v, self.Value(v)), end=' ')
     print()
     self.__solution_count += 1
 
@@ -292,7 +333,7 @@ class VarArrayAndObjectiveSolutionPrinter(cp_model.CpSolverSolutionCallback):
 
 
 def MinimalCpSatPrintIntermediateSolutions():
- """Showcases printing intermediate solutions found during search."""
+  """Showcases printing intermediate solutions found during search."""
   # Creates the model.
   model = cp_model.CpModel()
   # Creates the variables.
@@ -311,20 +352,24 @@ def MinimalCpSatPrintIntermediateSolutions():
 
   print('Status = %s' % solver.StatusName(status))
   print('Number of solutions found: %i' % solution_printer.SolutionCount())
+
+
+MinimalCpSatPrintIntermediateSolutions()
 ```
 
 ### C++ code
 
-```cpp
+```
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/cp_model_solver.h"
 #include "ortools/sat/cp_model_utils.h"
 #include "ortools/sat/model.h"
+#include "ortools/sat/sat_parameters.pb.h"
 
 namespace operations_research {
 namespace sat {
-void MinimalSatPrintIntermediateSolutions() {
 
+void MinimalSatPrintIntermediateSolutions() {
   CpModelProto cp_model;
 
   auto new_variable = [&cp_model](int64 lb, int64 ub) {
@@ -338,7 +383,7 @@ void MinimalSatPrintIntermediateSolutions() {
 
   auto add_different = [&cp_model](const int left_var, const int right_var) {
     LinearConstraintProto* const lin =
-    cp_model.add_constraints()->mutable_linear();
+        cp_model.add_constraints()->mutable_linear();
     lin->add_vars(left_var);
     lin->add_coeffs(1);
     lin->add_vars(right_var);
@@ -381,11 +426,17 @@ void MinimalSatPrintIntermediateSolutions() {
     num_solutions++;
   }));
   const CpSolverResponse response = SolveCpModel(cp_model, &model);
-  LOG(INFO) << 'Number of solutions found: ' << num_solutions;
+  LOG(INFO) << "Number of solutions found: " << num_solutions;
 }
 
 }  // namespace sat
 }  // namespace operations_research
+
+int main() {
+  operations_research::sat::MinimalSatPrintIntermediateSolutions();
+
+  return EXIT_SUCCESS;
+}
 ```
 
 ### C\# code
@@ -438,9 +489,11 @@ public class CodeSamplesSat
     IntVar x = model.NewIntVar(0, num_vals - 1, 'x');
     IntVar y = model.NewIntVar(0, num_vals - 1, 'y');
     IntVar z = model.NewIntVar(0, num_vals - 1, 'z');
-    // Creates the constraints.
+
+    // Adds a different constraint.
     model.Add(x != y);
-    // Creates the objective.
+
+    // Maximizes a linear combination of variables.
     model.Maximize(x + 2 * y + 3 * z);
 
     // Creates a solver and solves the model.
@@ -470,11 +523,16 @@ The exact implementation depends on the target language.
 
 To search for all solutions, the SearchForAllSolutions method must be used.
 
-```python
+```
+"""Code sample that solves a model and displays all solutions."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from ortools.sat.python import cp_model
 
 
-# You need to subclass the cp_model.CpSolverSolutionCallback class.
 class VarArraySolutionPrinter(cp_model.CpSolverSolutionCallback):
   """Print intermediate solutions."""
 
@@ -483,40 +541,43 @@ class VarArraySolutionPrinter(cp_model.CpSolverSolutionCallback):
     self.__solution_count = 0
 
   def NewSolution(self):
-    print('Solution %i' % self.__solution_count)
-    for v in self.__variables:
-      print('  %s = %i' % (v, self.Value(v)), end = ' ')
-    print()
     self.__solution_count += 1
+    for v in self.__variables:
+      print('%s=%i' % (v, self.Value(v)), end=' ')
+    print()
 
   def SolutionCount(self):
     return self.__solution_count
 
 
 def MinimalSatSearchForAllSolutions():
+  """Showcases calling the solver to search for all solutions."""
   # Creates the model.
   model = cp_model.CpModel()
   # Creates the variables.
   num_vals = 3
-  x = model.NewIntVar(0, num_vals - 1, "x")
-  y = model.NewIntVar(0, num_vals - 1, "y")
-  z = model.NewIntVar(0, num_vals - 1, "z")
-  # Creates the constraint.
+  x = model.NewIntVar(0, num_vals - 1, 'x')
+  y = model.NewIntVar(0, num_vals - 1, 'y')
+  z = model.NewIntVar(0, num_vals - 1, 'z')
+  # Create the constraints.
   model.Add(x != y)
 
-  # Creates a solver and solve.
+  # Create a solver and solve.
   solver = cp_model.CpSolver()
   solution_printer = VarArraySolutionPrinter([x, y, z])
   status = solver.SearchForAllSolutions(model, solution_printer)
   print('Status = %s' % solver.StatusName(status))
   print('Number of solutions found: %i' % solution_printer.SolutionCount())
+
+
+MinimalSatSearchForAllSolutions()
 ```
 
 ### C++ code
 
 To search for all solution, a parameter of the sat solver must be changed.
 
-```cpp
+```
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/cp_model_solver.h"
 #include "ortools/sat/cp_model_utils.h"
@@ -525,6 +586,7 @@ To search for all solution, a parameter of the sat solver must be changed.
 
 namespace operations_research {
 namespace sat {
+
 void MinimalSatSearchForAllSolutions() {
   CpModelProto cp_model;
 
@@ -539,7 +601,7 @@ void MinimalSatSearchForAllSolutions() {
 
   auto add_different = [&cp_model](const int left_var, const int right_var) {
     LinearConstraintProto* const lin =
-    cp_model.add_constraints()->mutable_linear();
+        cp_model.add_constraints()->mutable_linear();
     lin->add_vars(left_var);
     lin->add_coeffs(1);
     lin->add_vars(right_var);
@@ -578,6 +640,12 @@ void MinimalSatSearchForAllSolutions() {
 
 }  // namespace sat
 }  // namespace operations_research
+
+int main() {
+  operations_research::sat::MinimalSatSearchForAllSolutions();
+
+  return EXIT_SUCCESS;
+}
 ```
 
 ### C\# code
@@ -631,7 +699,8 @@ public class CodeSamplesSat
     IntVar x = model.NewIntVar(0, num_vals - 1, "x");
     IntVar y = model.NewIntVar(0, num_vals - 1, "y");
     IntVar z = model.NewIntVar(0, num_vals - 1, "z");
-    // Creates the constraints.
+
+    // Adds a different constraint.
     model.Add(x != y);
 
     // Creates a solver and solves the model.

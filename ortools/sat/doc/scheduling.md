@@ -4,27 +4,33 @@
 
 ## Introduction
 
-Scheduling in Operations Research deals with tasks that times. In general,
-scheduling problems have the following features: fixed or variable durations,
-alternate ways of performing the same task, mutual exclusivity between tasks,
-and temporal relations between tasks.
+Scheduling in Operations Research involves problems of tasks, resources and
+times. In general, scheduling problems have the following features: fixed or
+variable durations, alternate ways of performing the same task, mutual
+exclusivity between tasks, and temporal relations between tasks.
 
 ## Interval variables
 
 Intervals are constraints containing three integer variables (start, size, and
 end). Creating an interval constraint will enforce that start + size == end.
 
-To create an interval, we need to create three variables, for the start, the
-size, and the end of the interval. Then we create an interval constraint using
-these three variables.
+4:15PM, Jun 20 To define an interval, we need to create three variables: start,
+size, and end.Then we create an interval constraint using these three variables.
 
-We give two code snippets the demonstrate how to build these objects in python,
+We give two code snippets the demonstrate how to build these objects in Python,
 C++, and C\#.
 
 ### Python code
 
-```python
+```
+"""Code sample to demonstrates how to build an interval."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from ortools.sat.python import cp_model
+
 
 def IntervalSample():
   model = cp_model.CpModel()
@@ -35,12 +41,19 @@ def IntervalSample():
   interval_var = model.NewIntervalVar(start_var, duration, end_var, 'interval')
   print('start = %s, duration = %i, end = %s, interval = %s' %
         (start_var, duration, end_var, interval_var))
+
+
+IntervalSample()
 ```
 
 ### C++ code
 
-```cpp
+```
 #include "ortools/sat/cp_model.pb.h"
+#include "ortools/sat/cp_model_solver.h"
+#include "ortools/sat/cp_model_utils.h"
+#include "ortools/sat/model.h"
+#include "ortools/sat/sat_parameters.pb.h"
 
 namespace operations_research {
 namespace sat {
@@ -83,6 +96,12 @@ void IntervalSample() {
 
 }  // namespace sat
 }  // namespace operations_research
+
+int main() {
+  operations_research::sat::IntervalSample();
+
+  return EXIT_SUCCESS;
+}
 ```
 
 ### C\# code
@@ -120,8 +139,15 @@ understand these presence literals, and correctly ignore inactive intervals.
 
 ### Python code
 
-```python
+```
+"""Code sample to demonstrates how to build an optional interval."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from ortools.sat.python import cp_model
+
 
 def OptionalIntervalSample():
   model = cp_model.CpModel()
@@ -129,17 +155,24 @@ def OptionalIntervalSample():
   start_var = model.NewIntVar(0, horizon, 'start')
   duration = 10  # Python cp/sat code accept integer variables or constants.
   end_var = model.NewIntVar(0, horizon, 'end')
-  presence = model.NewBoolVar('presence')
+  presence_var = model.NewBoolVar('presence')
   interval_var = model.NewOptionalIntervalVar(start_var, duration, end_var,
-                                              presence, 'interval')
-  print('start = %s, duration = %i, end = %s, interval = %s' %
-        (start_var, duration, end_var, interval_var))
+                                              presence_var, 'interval')
+  print('start = %s, duration = %i, end = %s, presence = %s, interval = %s' %
+        (start_var, duration, end_var, presence_var, interval_var))
+
+
+OptionalIntervalSample()
 ```
 
 ### C++ code
 
-```cpp
+```
 #include "ortools/sat/cp_model.pb.h"
+#include "ortools/sat/cp_model_solver.h"
+#include "ortools/sat/cp_model_utils.h"
+#include "ortools/sat/model.h"
+#include "ortools/sat/sat_parameters.pb.h"
 
 namespace operations_research {
 namespace sat {
@@ -162,7 +195,7 @@ void OptionalIntervalSample() {
   };
 
   auto new_optional_interval = [&cp_model](int start, int duration, int end,
-                                          int presence) {
+                                           int presence) {
     const int index = cp_model.constraints_size();
     ConstraintProto* const ct = cp_model.add_constraints();
     ct->add_enforcement_literal(presence);
@@ -177,17 +210,22 @@ void OptionalIntervalSample() {
   const int duration_var = new_constant(10);
   const int end_var = new_variable(0, kHorizon);
   const int presence_var = new_variable(0, 1);
-  const int interval_var = new_optional_interval(start_var, duration_var,
-                                                 end_var, presence_var);
+  const int interval_var =
+      new_optional_interval(start_var, duration_var, end_var, presence_var);
   LOG(INFO) << "start_var = " << start_var
-            << ", duration_var = " << duration_var
-            << ", end_var = " << end_var
+            << ", duration_var = " << duration_var << ", end_var = " << end_var
             << ", presence_var = " << presence_var
             << ", interval_var = " << interval_var;
 }
 
 }  // namespace sat
 }  // namespace operations_research
+
+int main() {
+  operations_research::sat::OptionalIntervalSample();
+
+  return EXIT_SUCCESS;
+}
 ```
 
 ### C\# code
@@ -220,7 +258,7 @@ public class CodeSamplesSat
 
 ## NoOverlap constraint
 
-A no overlap constraints simply states that  all intervals are disjoint.
+A no overlap constraint simply states that all intervals are disjoint.
 
 ## Cumulative constraint
 

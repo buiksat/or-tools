@@ -2958,9 +2958,9 @@ void RevisedSimplex::DisplayVariableBounds() {
   }
 }
 
-ITIVector<RowIndex, SparseRow> RevisedSimplex::ComputeDictionary(
+gtl::ITIVector<RowIndex, SparseRow> RevisedSimplex::ComputeDictionary(
     const DenseRow* column_scales) {
-  ITIVector<RowIndex, SparseRow> dictionary(num_rows_.value());
+  gtl::ITIVector<RowIndex, SparseRow> dictionary(num_rows_.value());
   for (ColIndex col(0); col < num_cols_; ++col) {
     ComputeDirection(col);
     for (const RowIndex row : direction_.non_zeros) {
@@ -2978,6 +2978,17 @@ ITIVector<RowIndex, SparseRow> RevisedSimplex::ComputeDictionary(
     }
   }
   return dictionary;
+}
+
+void RevisedSimplex::ComputeBasicVariablesForState(
+    const LinearProgram& linear_program, const BasisState& state) {
+  LoadStateForNextSolve(state);
+  Status status = Initialize(linear_program);
+  if (status.ok()) {
+    variable_values_.RecomputeBasicVariableValues();
+    variable_values_.ResetPrimalInfeasibilityInformation();
+    solution_objective_value_ = ComputeInitialProblemObjectiveValue();
+  }
 }
 
 void RevisedSimplex::DisplayRevisedSimplexDebugInfo() {

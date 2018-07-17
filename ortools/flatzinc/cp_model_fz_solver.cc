@@ -13,18 +13,26 @@
 
 #include "ortools/flatzinc/cp_model_fz_solver.h"
 
+#include <atomic>
+#include <cmath>
+#include <limits>
 #include <unordered_map>
 
 #include "google/protobuf/text_format.h"
 #include "ortools/base/join.h"
 #include "ortools/base/map_util.h"
+#include "ortools/base/mutex.h"
 #include "ortools/base/split.h"
 #include "ortools/base/stringpiece_utils.h"
+#include "ortools/base/stringprintf.h"
+#include "ortools/base/threadpool.h"
 #include "ortools/base/timer.h"
 #include "ortools/flatzinc/checker.h"
 #include "ortools/flatzinc/logging.h"
+#include "ortools/port/proto_utils.h"
 #include "ortools/sat/cp_constraints.h"
 #include "ortools/sat/cp_model.pb.h"
+#include "ortools/sat/cp_model_search.h"
 #include "ortools/sat/cp_model_solver.h"
 #include "ortools/sat/cp_model_utils.h"
 #include "ortools/sat/cumulative.h"
@@ -39,7 +47,6 @@
 #include "ortools/util/sigint.h"
 #include "ortools/util/time_limit.h"
 
-DEFINE_string(cp_sat_params, "", "SatParameters as a text proto.");
 DEFINE_bool(use_flatzinc_format, true, "Output uses the flatzinc format");
 
 namespace operations_research {
@@ -740,18 +747,6 @@ void CpModelProtoWithMapping::TranslateSearchAnnotations(
       }
     }
   }
-
-  // Always add a fallback strategy with all the variables because on quite a
-  // few instances, fixing all the variable above will not fix all variables.
-  //
-  // TODO(user): this is not ideal because it will force all Booleans to be
-  // seen as integer variable while loading the cp_model proto.
-  {
-    DecisionStrategyProto* strategy = proto.add_search_strategy();
-    for (int i = 0; i < proto.variables_size(); ++i) {
-      strategy->add_variables(i);
-    }
-  }
 }
 
 // The format is fixed in the flatzinc specification.
@@ -819,7 +814,11 @@ void LogInFlatzincFormat(const std::string& multi_line_input) {
 }  // namespace
 
 void SolveFzWithCpModelProto(const fz::Model& fz_model,
-                             const fz::FlatzincParameters& p) {
+                             const fz::FlatzincParameters& p,
+                             const std::string& sat_params) {
+  WallTimer timer;
+  timer.Start();
+
   CpModelProtoWithMapping m;
   m.proto.set_name(fz_model.name());
 
@@ -888,32 +887,6 @@ void SolveFzWithCpModelProto(const fz::Model& fz_model,
   // Fill the search order.
   m.TranslateSearchAnnotations(fz_model.search_annotations());
 
-  // The order is important, we want the flag parameters to overwrite anything
-  // set in m.parameters.
-  sat::SatParameters flag_parameters;
-  CHECK(google::protobuf::TextFormat::ParseFromString(FLAGS_cp_sat_params,
-                                                      &flag_parameters))
-      << FLAGS_cp_sat_params;
-  m.parameters.MergeFrom(flag_parameters);
-  if (p.all_solutions && !m.proto.has_objective()) {
-    // Enumerate all sat solutions.
-    m.parameters.set_enumerate_all_solutions(true);
-  }
-  if (!p.free_search) {
-    m.parameters.set_search_branching(SatParameters::FIXED_SEARCH);
-  }
-
-  if (p.time_limit_in_ms > 0) {
-    m.parameters.set_max_time_in_seconds(p.time_limit_in_ms * 1e-3);
-  }
-
-  bool stopped = false;
-  Model sat_model;
-  sat_model.Add(NewSatParameters(m.parameters));
-  sat_model.GetOrCreate<TimeLimit>()->RegisterExternalBooleanAsLimit(&stopped);
-  sat_model.GetOrCreate<SigintHandler>()->Register(
-      [&stopped]() { stopped = true; });
-
   // Print model statistics.
   if (!FLAGS_use_flatzinc_format) {
     LOG(INFO) << CpModelStats(m.proto);
@@ -921,40 +894,76 @@ void SolveFzWithCpModelProto(const fz::Model& fz_model,
     LogInFlatzincFormat(CpModelStats(m.proto));
   }
 
-  // Add solution observer.
-  if (FLAGS_use_flatzinc_format && p.all_solutions) {
-    int solution_count = 1;  // Start at 1 as in the sat solver output.
-    auto printer = [&fz_model, &solution_count,
-                    &m](const sat::CpSolverResponse& response) {
-      const std::string solution_string =
-          SolutionString(fz_model, [&response, &m](fz::IntegerVariable* v) {
-            return response.solution(m.fz_var_to_index[v]);
-          });
-      std::cout << "%% solution #" << solution_count++ << std::endl;
-      std::cout << solution_string << std::endl;
-    };
-    sat_model.Add(NewFeasibleSolutionObserver(printer));
+  if (p.all_solutions && !m.proto.has_objective()) {
+    // Enumerate all sat solutions.
+    m.parameters.set_enumerate_all_solutions(true);
+  }
+  if (p.free_search) {
+    m.parameters.set_search_branching(SatParameters::AUTOMATIC_SEARCH);
+  } else {
+    m.parameters.set_search_branching(SatParameters::FIXED_SEARCH);
+  }
+  if (p.time_limit_in_ms > 0) {
+    m.parameters.set_max_time_in_seconds(p.time_limit_in_ms * 1e-3);
   }
 
-  // Solve.
+  // We don't support enumerating all solution in parallel for a SAT problem.
+  // But note that we do support it for an optimization problem since the
+  // meaning of p.all_solutions is not the same in this case.
+  if (p.all_solutions && fz_model.objective() == nullptr) {
+    m.parameters.set_num_search_workers(1);
+  } else {
+    m.parameters.set_num_search_workers(std::max(1, p.threads));
+  }
+
+  // The order is important, we want the flag parameters to overwrite anything
+  // set in m.parameters.
+  sat::SatParameters flag_parameters;
+  CHECK(google::protobuf::TextFormat::ParseFromString(sat_params,
+                                                      &flag_parameters))
+      << sat_params;
+  m.parameters.MergeFrom(flag_parameters);
+
+  std::atomic<bool> stopped(false);
+  SigintHandler handler;
+  handler.Register([&stopped]() { stopped = true; });
+
+  // We only need an observer if 'p.all_solutions' is true.
+  std::function<void(const CpSolverResponse&)> solution_observer = nullptr;
+  if (p.all_solutions && FLAGS_use_flatzinc_format) {
+    solution_observer = [&fz_model, &m](const CpSolverResponse& r) {
+      const std::string solution_string =
+          SolutionString(fz_model, [&m, &r](fz::IntegerVariable* v) {
+            return r.solution(gtl::FindOrDie(m.fz_var_to_index, v));
+          });
+      std::cout << solution_string << std::endl;
+    };
+  }
+
+  Model sat_model;
+  sat_model.Add(NewSatParameters(m.parameters));
+  sat_model.GetOrCreate<TimeLimit>()->RegisterExternalBooleanAsLimit(&stopped);
+  if (solution_observer != nullptr) {
+    sat_model.Add(NewFeasibleSolutionObserver(solution_observer));
+  }
   const CpSolverResponse response = SolveCpModel(m.proto, &sat_model);
 
   // Check the returned solution with the fz model checker.
-  if (response.status() == CpSolverStatus::MODEL_SAT ||
+  if (response.status() == CpSolverStatus::FEASIBLE ||
       response.status() == CpSolverStatus::OPTIMAL) {
     CHECK(CheckSolution(fz_model, [&response, &m](fz::IntegerVariable* v) {
-      return response.solution(m.fz_var_to_index[v]);
+      return response.solution(gtl::FindOrDie(m.fz_var_to_index, v));
     }));
   }
 
-  // Output the solution if the flatzinc official format.
+  // Output the solution in the flatzinc official format.
   if (FLAGS_use_flatzinc_format) {
-    if (response.status() == CpSolverStatus::MODEL_SAT ||
+    if (response.status() == CpSolverStatus::FEASIBLE ||
         response.status() == CpSolverStatus::OPTIMAL) {
-      if (!p.all_solutions) {  // Already printed in the other case.
+      if (!p.all_solutions) {  // Already printed otherwise.
         const std::string solution_string =
             SolutionString(fz_model, [&response, &m](fz::IntegerVariable* v) {
-              return response.solution(m.fz_var_to_index[v]);
+              return response.solution(gtl::FindOrDie(m.fz_var_to_index, v));
             });
         std::cout << solution_string << std::endl;
       }
@@ -962,7 +971,7 @@ void SolveFzWithCpModelProto(const fz::Model& fz_model,
           response.all_solutions_were_found()) {
         std::cout << "==========" << std::endl;
       }
-    } else if (response.status() == CpSolverStatus::MODEL_UNSAT) {
+    } else if (response.status() == CpSolverStatus::INFEASIBLE) {
       std::cout << "=====UNSATISFIABLE=====" << std::endl;
     } else {
       std::cout << "%% TIMEOUT" << std::endl;

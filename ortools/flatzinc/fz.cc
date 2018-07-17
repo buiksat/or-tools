@@ -43,7 +43,8 @@ DEFINE_bool(all_solutions, false, "Search for all solutions.");
 DEFINE_int32(num_solutions, 0,
              "Maximum number of solution to search for, 0 means unspecified.");
 DEFINE_bool(free_search, false,
-            "Ignore search annotations in the flatzinc model.");
+            "If false, the solver must follow the defined search."
+            "If true, other search are allowed.");
 DEFINE_int32(threads, 0, "Number of threads the solver will use.");
 DEFINE_bool(presolve, true, "Presolve the model to simplify it.");
 DEFINE_bool(statistics, false, "Print solver statistics after search.");
@@ -67,6 +68,7 @@ DEFINE_bool(verbose_mt, false, "Verbose Multi-Thread.");
 DEFINE_bool(use_cp_sat, true, "Use the CP/SAT solver.");
 DEFINE_string(fz_model_name, "stdin",
               "Define problem name when reading from stdin.");
+DEFINE_string(params, "", "SatParameters as a text proto.");
 
 DECLARE_bool(fz_use_sat);
 DECLARE_bool(log_prefix);
@@ -321,7 +323,7 @@ int main(int argc, char** argv) {
 
   if (FLAGS_use_cp_sat) {
     operations_research::sat::SolveFzWithCpModelProto(
-        model, operations_research::fz::SingleThreadParameters());
+        model, operations_research::fz::SingleThreadParameters(), FLAGS_params);
   } else {
     operations_research::fz::Solve(model);
   }

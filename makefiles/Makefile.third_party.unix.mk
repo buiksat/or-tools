@@ -218,11 +218,15 @@ PROTOBUF_PROTOC_INC = $(PROTOBUF_INC)
 # libprotobuf.a goes in a different subdirectory depending on the distribution
 # and architecture, eg. "lib/" or "lib64/" for Fedora and Centos,
 # "lib/x86_64-linux-gnu/" for Ubuntu (all on 64 bits), etc. So we wildcard it.
-STATIC_PROTOBUF_LNK = $(wildcard $(UNIX_PROTOBUF_DIR)/lib*/libprotobuf.a \
-                          $(UNIX_PROTOBUF_DIR)/lib/*/libprotobuf.a)
-_PROTOBUF_LIB_DIR = $(wildcard $(UNIX_PROTOBUF_DIR)/lib*/libprotobuf.$L \
-                          $(UNIX_PROTOBUF_DIR)/lib/*/libprotobuf.$L)
-DYNAMIC_PROTOBUF_LNK = -L$(dir $(_PROTOBUF_LIB_DIR)) -lprotobuf
+STATIC_PROTOBUF_LNK = $(wildcard \
+ $(UNIX_PROTOBUF_DIR)/lib*/libprotobuf.a \
+ $(UNIX_PROTOBUF_DIR)/lib*/libprotobuf.a@ \
+ $(UNIX_PROTOBUF_DIR)/lib/*/libprotobuf.a)
+_PROTOBUF_LIB_DIR = $(dir $(wildcard \
+ $(UNIX_PROTOBUF_DIR)/lib*/libprotobuf.$L \
+ $(UNIX_PROTOBUF_DIR)/lib*/libprotobuf.$L@ \
+ $(UNIX_PROTOBUF_DIR)/lib/*/libprotobuf.$L))
+DYNAMIC_PROTOBUF_LNK = -L$(_PROTOBUF_LIB_DIR) -lprotobuf
 
 ifeq ($(UNIX_PROTOBUF_DIR), $(OR_TOOLS_TOP)/dependencies/install)
 DEPENDENCIES_LNK += $(DYNAMIC_PROTOBUF_LNK)
@@ -629,9 +633,6 @@ Makefile.local: makefiles/Makefile.third_party.unix.mk
 	@echo "#   e.g. UNIX_SWIG_BINARY = /opt/swig-x.y.z/bin/swig" >> Makefile.local
 	@echo JAVA_HOME = $(JAVA_HOME)>> Makefile.local
 	@echo UNIX_PYTHON_VER = $(DETECTED_PYTHON_VERSION)>> Makefile.local
-	@echo PATH_TO_CSHARP_COMPILER = $(DETECTED_MCS_BINARY)>> Makefile.local
-	@echo PATH_TO_DOTNET_COMPILER = $(DETECTED_DOTNET_BINARY)>> Makefile.local
-	@echo CLR_KEYFILE = bin/or-tools.snk>> Makefile.local
 	@echo >> Makefile.local
 	@echo "## OPTIONAL DEPENDENCIES ##" >> Makefile.local
 	@echo "# Define UNIX_CPLEX_DIR to use CPLEX" >> Makefile.local

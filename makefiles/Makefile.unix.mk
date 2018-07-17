@@ -6,7 +6,13 @@ LIB_PREFIX = lib
 SRC_DIR = $(OR_ROOT).
 EX_DIR  = $(OR_ROOT)examples
 GEN_DIR = $(OR_ROOT)ortools/gen
+GEN_PATH = $(subst /,$S,$(GEN_DIR))
+JAVA_EX_DIR  = $(OR_ROOT)examples/java
+JAVA_EX_PATH = $(subst /,$S,$(JAVA_EX_DIR))
+DOTNET_EX_DIR  = $(OR_ROOT)examples/dotnet
+DOTNET_EX_PATH = $(subst /,$S,$(DOTNET_EX_DIR))
 OBJ_DIR = $(OR_ROOT)objs
+CLASS_DIR = $(OR_ROOT)classes
 LIB_DIR = $(OR_ROOT)lib
 BIN_DIR = $(OR_ROOT)bin
 INC_DIR = $(OR_ROOT).
@@ -19,7 +25,7 @@ L = so
 else # MACOS
 L = dylib
 endif
-DLL=.dll
+D=.dll
 PDB=.pdb
 EXP=.exp
 ARCHIVE_EXT = .tar.gz
@@ -28,6 +34,7 @@ LD_OUT = -o # need the space.
 OBJ_OUT = -o # need the space
 EXE_OUT = -o # need the space
 S = /
+CMDSEP=;
 CPSEP = :
 
 COPY = cp
@@ -39,6 +46,7 @@ MKDIR = mkdir
 MKDIR_P = mkdir -p
 RENAME = mv
 SED = sed
+TAR = tar
 TOUCH = touch
 WHICH = which
 
@@ -148,19 +156,21 @@ ifeq ($(PLATFORM),LINUX)
   JAR_BIN = $(shell $(WHICH) $(JAVA_HOME)/bin/jar)
   JNI_LIB_EXT = so
 
-  SWIG_LIB_SUFFIX = so
+  SWIG_PYTHON_LIB_SUFFIX = so
+  SWIG_DOTNET_LIB_SUFFIX = so
   LINK_CMD = $(DYNAMIC_LD)
   PRE_LIB = -L$(OR_ROOT_FULL)/lib -l
-  #PRE_LIB = -Wl,-rpath $(OR_ROOT_FULL)/lib -L$(OR_ROOT_FULL)/lib -l
   POST_LIB =
   LINK_FLAGS = \
  -Wl,-rpath,"\$$ORIGIN" \
  -Wl,-rpath,"\$$ORIGIN/../lib" \
+ -Wl,-rpath,"\$$ORIGIN/../dependencies/install/lib64" \
  -Wl,-rpath,"\$$ORIGIN/../dependencies/install/lib"
   PYTHON_LDFLAGS = \
  -Wl,-rpath,"\$$ORIGIN" \
  -Wl,-rpath,"\$$ORIGIN/../../ortools" \
  -Wl,-rpath,"\$$ORIGIN/../../../../lib" \
+ -Wl,-rpath,"\$$ORIGIN/../../../../dependencies/install/lib64" \
  -Wl,-rpath,"\$$ORIGIN/../../../../dependencies/install/lib"
 endif  # ifeq ($(PLATFORM),LINUX)
 ifeq ($(PLATFORM),MACOSX)
@@ -205,7 +215,8 @@ ifeq ($(PLATFORM),MACOSX)
   JAR_BIN = $(shell $(WHICH) $(JAVA_HOME)/bin/jar)
   JNI_LIB_EXT = jnilib
 
-  SWIG_LIB_SUFFIX = so# To overcome a bug in Mac OS X loader.
+  SWIG_PYTHON_LIB_SUFFIX = so# To overcome a bug in Mac OS X loader.
+  SWIG_DOTNET_LIB_SUFFIX = dll# To overcome a bug in Mac OS X loader.
   LINK_CMD = clang++ -dynamiclib \
  -Wl,-search_paths_first \
  -Wl,-headerpad_max_install_names \
