@@ -18,14 +18,15 @@ BIN_DIR = $(OR_ROOT)bin
 INC_DIR = $(OR_ROOT).
 DEP_BIN_DIR = $(OR_ROOT)dependencies/install/bin
 
-O = o
+O =o
 E =
 ifeq ($(PLATFORM),LINUX)
 L = so
 else # MACOS
 L = dylib
 endif
-D=.dll
+J =.jar
+D =.dll
 PDB=.pdb
 EXP=.exp
 ARCHIVE_EXT = .tar.gz
@@ -58,20 +59,18 @@ endif
 # This is needed to find python.h
 PYTHON_VERSION = $(UNIX_PYTHON_VER)
 MAJOR_PYTHON_VERSION = $(shell python$(UNIX_PYTHON_VER) -c "from sys import version_info as v; print (str(v[0]))")
+MINOR_PYTHON_VERSION = $(shell python$(UNIX_PYTHON_VER) -c "from sys import version_info as v; print (str(v[1]))")
 
 PATH_TO_PYTHON_LIB = $(shell python$(UNIX_PYTHON_VER) -c 'import sysconfig; print (sysconfig.get_paths()["stdlib"])')
 PATH_TO_PYTHON_INCLUDE = $(shell python$(UNIX_PYTHON_VER) -c 'import sysconfig; print (sysconfig.get_paths()["platinclude"])')
 PYTHON_INC = -I$(PATH_TO_PYTHON_INCLUDE) -I$(PATH_TO_PYTHON_LIB) $(ADD_PYTHON_INC)
 
 PYTHON_INC += $(shell pkg-config --cflags python$(MAJOR_PYTHON_VERSION) 2> /dev/null)
-PYTHON_LNK += $(shell pkg-config --libs python$(MAJOR_PYTHON_VERSION) 2> /dev/null)
+#PYTHON_LNK += $(shell pkg-config --libs   python$(MAJOR_PYTHON_VERSION) 2> /dev/null)
 
-ifeq ("${PYTHON_LNK}","")
-PYTHON_LNK = "-lpython${UNIX_PYTHON_VERSION}"
-endif
-
-MONO_COMPILER ?= mono
-MONO_EXECUTABLE := $(shell $(WHICH) $(MONO_COMPILER))
+#ifeq ("${PYTHON_LNK}","")
+#PYTHON_LNK = "-lpython${UNIX_PYTHON_VERSION}"
+#endif
 
 # This is needed to find GLPK include files.
 ifdef UNIX_GLPK_DIR
@@ -105,7 +104,6 @@ ifeq ($(PLATFORM),LINUX)
   CCC = g++ -fPIC -std=c++11 -fwrapv
   DYNAMIC_LD = g++ -shared
   DYNAMIC_LDFLAGS = -Wl,-rpath,\"\\\$$\$$ORIGIN\"
-  MONO = LD_LIBRARY_PATH=$(LIB_DIR):$(LD_LIBRARY_PATH) $(MONO_EXECUTABLE)
 
   # This is needed to find libz.a
   ZLIB_LNK = -lz
@@ -162,27 +160,27 @@ ifeq ($(PLATFORM),LINUX)
   PRE_LIB = -L$(OR_ROOT_FULL)/lib -l
   POST_LIB =
   LINK_FLAGS = \
- -Wl,-rpath,"\$$ORIGIN" \
- -Wl,-rpath,"\$$ORIGIN/../lib" \
- -Wl,-rpath,"\$$ORIGIN/../dependencies/install/lib64" \
- -Wl,-rpath,"\$$ORIGIN/../dependencies/install/lib"
+ -Wl,-rpath,'$$ORIGIN' \
+ -Wl,-rpath,'$$ORIGIN/../lib' \
+ -Wl,-rpath,'$$ORIGIN/../dependencies/install/lib64' \
+ -Wl,-rpath,'$$ORIGIN/../dependencies/install/lib'
   PYTHON_LDFLAGS = \
- -Wl,-rpath,"\$$ORIGIN" \
- -Wl,-rpath,"\$$ORIGIN/../../ortools" \
- -Wl,-rpath,"\$$ORIGIN/../../../../lib" \
- -Wl,-rpath,"\$$ORIGIN/../../../../dependencies/install/lib64" \
- -Wl,-rpath,"\$$ORIGIN/../../../../dependencies/install/lib"
+ -Wl,-rpath,'$$ORIGIN' \
+ -Wl,-rpath,'$$ORIGIN/../../ortools' \
+ -Wl,-rpath,'$$ORIGIN/../../ortools/.libs' \
+ -Wl,-rpath,'$$ORIGIN/../../../../lib' \
+ -Wl,-rpath,'$$ORIGIN/../../../../dependencies/install/lib64' \
+ -Wl,-rpath,'$$ORIGIN/../../../../dependencies/install/lib'
 endif  # ifeq ($(PLATFORM),LINUX)
 ifeq ($(PLATFORM),MACOSX)
   MAC_VERSION = -mmacosx-version-min=$(MAC_MIN_VERSION)
   CCC = clang++ -fPIC -std=c++11  $(MAC_VERSION) -stdlib=libc++
-  DYNAMIC_LD = clang++ -dynamiclib \
+  DYNAMIC_LD = clang++ -dynamiclib -undefined dynamic_lookup \
  -Wl,-search_paths_first \
  -Wl,-headerpad_max_install_names \
  -current_version $(OR_TOOLS_SHORT_VERSION) \
  -compatibility_version $(OR_TOOLS_SHORT_VERSION)
   DYNAMIC_LDFLAGS = -Wl,-rpath,\"@loader_path\"
-  MONO =  DYLD_FALLBACK_LIBRARY_PATH=$(LIB_DIR):$(DYLD_LIBRARY_PATH) $(MONO_EXECUTABLE)
 
   ZLIB_LNK = -lz
   ifdef UNIX_GLPK_DIR
@@ -232,6 +230,7 @@ ifeq ($(PLATFORM),MACOSX)
   PYTHON_LDFLAGS = \
  -Wl,-rpath,@loader_path \
  -Wl,-rpath,@loader_path/../../ortools \
+ -Wl,-rpath,@loader_path/../../ortools/.libs \
  -Wl,-rpath,@loader_path/../../../../lib \
  -Wl,-rpath,@loader_path/../../../../dependencies/install/lib
 endif # ifeq ($(PLATFORM),MACOSX)
