@@ -23,13 +23,13 @@
    Distances are in meters.
 """
 
-from six.moves import xrange
 # import ortools
 # from ortools.constraint_solver import *
 import sys
 sys.path.insert(0, "/home/bahram/anaconda3/lib/python3.6/site-packages/")
 from ortools.constraint_solver import pywrapcp
 from ortools.constraint_solver import routing_enums_pb2
+from collections import namedtuple
 
 ###########################
 # Problem Data Definition #
@@ -95,9 +95,9 @@ class CreateDistanceEvaluator(object):  # pylint: disable=too-few-public-methods
     self._distances = {}
 
     # precompute distance between location to have distance callback in O(1)
-    for from_node in xrange(data.num_locations):
+    for from_node in range(data.num_locations):
       self._distances[from_node] = {}
-      for to_node in xrange(data.num_locations):
+      for to_node in range(data.num_locations):
         if from_node == to_node:
           self._distances[from_node][to_node] = 0
         else:
@@ -114,9 +114,9 @@ class CreateDistanceEvaluator(object):  # pylint: disable=too-few-public-methods
 ###########
 def print_solution(data, routing, assignment):
   """Prints assignment on console"""
-  print('Objective: {}'.format(assignment.ObjectiveValue()))
+  print(('Objective: {}'.format(assignment.ObjectiveValue())))
   total_distance = 0
-  for vehicle_id in xrange(data.num_vehicles):
+  for vehicle_id in range(data.num_vehicles):
     index = routing.Start(vehicle_id)
     plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
     distance = 0
@@ -129,7 +129,7 @@ def print_solution(data, routing, assignment):
     plan_output += 'Distance of the route: {}m\n'.format(distance)
     print(plan_output)
     total_distance += distance
-  print('Total Distance of all routes: {}m'.format(total_distance))
+  print(('Total Distance of all routes: {}m'.format(total_distance)))
 
 ########
 # Main #

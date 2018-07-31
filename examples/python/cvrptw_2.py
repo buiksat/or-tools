@@ -21,7 +21,8 @@
 
    Distances are in meters and time in minutes.
 """
-
+import sys
+sys.path.insert(0, '/home/bahram/.local/lib/python3.6/site-packages/')
 from collections import namedtuple
 from ortools.constraint_solver import pywrapcp
 from ortools.constraint_solver import routing_enums_pb2
@@ -46,12 +47,7 @@ class DataProblem():
             [(4, 4),  # depot
              (2, 0), (8, 0),  # order locations
              (0, 1), (1, 1),
-             (5, 2), (7, 2),
-             (3, 3), (6, 3),
-             (5, 5), (8, 5),
-             (1, 6), (2, 6),
-             (3, 7), (6, 7),
-             (0, 8), (7, 8)]
+             (5, 2), (7, 2)]
         # Compute locations in meters using the block dimension defined as follow
         # Manhattan average block: 750ft x 264ft -> 228m x 80m
         # here we use: 114m x 80m city block
@@ -64,23 +60,13 @@ class DataProblem():
             [0,  # depot
              1, 1,  # 1, 2
              2, 4,  # 3, 4
-             2, 4,  # 5, 6
-             8, 8,  # 7, 8
-             1, 2,  # 9,10
-             1, 2,  # 11,12
-             4, 4,  # 13, 14
-             8, 8]  # 15, 16
+             2, 4]  # 5, 6
 
         self._time_windows = \
-            [(0, 0),
+            [(0, 100),
              (75, 85), (75, 85),  # 1, 2
              (60, 70), (45, 55),  # 3, 4
-             (0, 8), (50, 60),  # 5, 6
-             (0, 10), (10, 20),  # 7, 8
-             (0, 10), (75, 85),  # 9, 10
-             (85, 95), (5, 15),  # 11, 12
-             (15, 25), (10, 20),  # 13, 14
-             (45, 55), (30, 40)]  # 15, 16
+             (0, 8), (50, 60)]  # 5, 6
 
     @property
     def vehicle(self):
@@ -241,7 +227,13 @@ def add_time_window_constraints(routing, data, time_evaluator):
     # and "copy" the slack var in the solution object (aka Assignment) to print it
     for vehicle_id in range(data.num_vehicles):
         index = routing.Start(vehicle_id)
+        print(index, " start")
+        index_end = routing.End(vehicle_id)
+        print(index_end, " End")
+        print("node", routing.NodeToIndex(index))
         time_dimension.CumulVar(index).SetRange(data.time_windows[0][0],
+                                                data.time_windows[0][1])
+        time_dimension.CumulVar(index_end).SetRange(data.time_windows[0][0],
                                                 data.time_windows[0][1])
         routing.AddToAssignment(time_dimension.SlackVar(index))
         # Warning: Slack var is not defined for vehicle's end node
@@ -309,7 +301,7 @@ def main():
     routing = pywrapcp.RoutingModel(
         data.num_locations,
         data.num_vehicles,
-        data.depot)
+        [1,4,0,4] ,[1,4,0,4] )
 
     # Define weight of each edge
     distance_evaluator = CreateDistanceEvaluator(data).distance_evaluator
@@ -324,7 +316,8 @@ def main():
     # Setting first solution heuristic (cheapest addition).
     search_parameters = pywrapcp.RoutingModel.DefaultSearchParameters()
     search_parameters.first_solution_strategy = (
-        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)  # pylint: disable=no-member
+        routing_enums_pb2.FirstSolutionStrategy.AUTOMATIC)  # pylint: disable=no-member
+
     # Solve the problem.
     assignment = routing.SolveWithParameters(search_parameters)
     print_solution(data, routing, assignment)
